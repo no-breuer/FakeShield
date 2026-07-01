@@ -19,10 +19,10 @@ mkdir -p "${WEIGHT_DIR}" "${DATA_DIR}"
 # 1. Model weights (~40 GB total)
 # --------------------------------------------------------------------------- #
 echo "==== Downloading FakeShield weights (~40 GB) ===="
-hf download --resume zhipeixu/fakeshield-v1-22b --local-dir "${WEIGHT_DIR}/fakeshield-v1-22b"
+hf download zhipeixu/fakeshield-v1-22b --local-dir "${WEIGHT_DIR}/fakeshield-v1-22b"
 
 echo "==== Downloading SAM ViT-H weight (~2.5 GB) ===="
-hf download --resume ybelkada/segment-anything \
+hf download ybelkada/segment-anything \
     checkpoints/sam_vit_h_4b8939.pth --local-dir "${WEIGHT_DIR}/_sam_tmp"
 mv "${WEIGHT_DIR}/_sam_tmp/checkpoints/sam_vit_h_4b8939.pth" "${WEIGHT_DIR}/sam_vit_h_4b8939.pth"
 rm -rf "${WEIGHT_DIR}/_sam_tmp"
@@ -31,11 +31,11 @@ rm -rf "${WEIGHT_DIR}/_sam_tmp"
 # 2. Scriptable datasets
 # --------------------------------------------------------------------------- #
 echo "==== Downloading SD_inpaint dataset (AIGC editing) ===="
-hf download --resume zhipeixu/SD_inpaint_dataset --repo-type dataset \
+hf download zhipeixu/SD_inpaint_dataset --repo-type dataset \
     --local-dir "${DATA_DIR}/aigc/SD_inpaint"
 
 echo "==== Downloading MMTD-Set-34k ===="
-hf download --resume zhipeixu/MMTD-Set-34k --repo-type dataset \
+hf download zhipeixu/MMTD-Set-34k --repo-type dataset \
     --local-dir "${DATA_DIR}/MMTD_Set"
 
 echo "==== Downloading coverage dataset (Photoshop forgery) ===="
