@@ -20,8 +20,12 @@ MMCV_TAG="v1.4.7"
 
 # --------------------------------------------------------------------------- #
 # 0. uv venv (seed so `pip` is available for test.sh's re-pins)
+#    --python-preference only-managed: force uv to download its own CPython
+#    (python-build-standalone), which ships Python.h in its include dir.
+#    The system python3.9 lacks dev headers (python3-devel), so C-extension
+#    builds like pycocotools fail with 'Python.h: No such file or directory'.
 # --------------------------------------------------------------------------- #
-uv venv --python 3.9 --seed "${VENV_DIR}"
+uv venv --python 3.9 --python-preference only-managed --seed "${VENV_DIR}"
 # shellcheck disable=SC1091
 source "${VENV_DIR}/bin/activate"
 
