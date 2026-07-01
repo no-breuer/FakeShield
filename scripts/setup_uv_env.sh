@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# Create a uv-managed Python 3.9 environment for FakeShield on the GPU cluster.
+#
+# Pinned per the repo README:
+#   Python 3.9, PyTorch 1.13.0, CUDA 11.6, transformers 4.28.0 (MFLM) / 4.37.2 (DTE-FDM),
+#   mmcv v1.4.7 (built from source), flash-attn 2.3.6.
+#
+# test.sh re-pins transformers between stages (4.37.2 -> 4.28.0), so this env
+# only needs the base 4.28.0; test.sh swaps it at runtime.
+#
+# Usage:
+#   bash scripts/setup_uv_env.sh
+# Override the PyTorch CUDA build via TORCH_INDEX, e.g. for CUDA 11.7:
+#   TORCH_INDEX=cu117 bash scripts/setup_uv_env.sh
+set -euo pipefail
+
+VENV_DIR="${VENV_DIR:-.venv}"
+TORCH_INDEX="${TORCH_INDEX:-cu116}"
+MMCV_TAG="v1.4.7"
+
+# --------------------------------------------------------------------------- #
+# 0. uv venv (seed so `pip` is available for test.sh's re-pins)
+# --------------------------------------------------------------------------- #
+uv venv --python 3.9 --seed "${VENV_DIR}"
+# shellcheck disable=SC1091
+source "${VENV_DIR}/bin/activate"
+
+python --version
+uv --version
+
+# --------------------------------------------------------------------------- #
+# 1. PyTorch 1.13.0 + torchvision 0.14.0 (CUDA 11.6 wheels)
+# --------------------------------------------------------------------------- #
+echo "==== Installing torch 1.13.0+${TORCH_INDEX} ===="
+uv pip install torch==1.13.0 torchvision==0.14.0 \
+    --index-url "https://download.pytorch.org/whl/${TORCH_INDEX}"
+
+# --------------------------------------------------------------------------- #
+# 2. Python deps from requirements.txt (transformers stays at 4.28.0 here)
+# --------------------------------------------------------------------------- #
+echo "==== Installing requirements.txt ===="
+uv pip install -r requirements.txt
+
+# --------------------------------------------------------------------------- #
+# 3. mmcv v1.4.7 from source (needs torch present -> no build isolation)
+# --------------------------------------------------------------------------- #
+echo "==== Installing mmcv ${MMCV_TAG} from source ===="
+MMCV_SRC="$(mktemp -d)/mmcv"
+git clone --depth 1 --branch "${MMCV_TAG}" https://github.com/open-mmlab/mmcv "${MMCV_SRC}"
+MMCV_WITH_OPS=1 uv pip install -e "${MMCV_SRC}" --no-build-isolation
+
+# --------------------------------------------------------------------------- #
+# 4. DTE-FDM editable (--no-deps: requirements.txt already covers its deps,
+#    avoids a scikit-learn 1.2.2 downgrade that conflicts with requirements.txt)
+# --------------------------------------------------------------------------- #
+echo "==== Installing DTE-FDM (editable, no-deps) ===="
+uv pip install -e ./DTE-FDM --no-deps
+
+# --------------------------------------------------------------------------- #
+# 5. flash-attn 2.3.6 (needs torch + ninja -> no build isolation)
+# --------------------------------------------------------------------------- #
+echo "==== Installing flash-attn 2.3.6 ===="
+uv pip install flash-attn==2.3.6 --no-build-isolation
+
+# --------------------------------------------------------------------------- #
+# 6. Verify
+# --------------------------------------------------------------------------- #
+echo
+echo "==== Verify ===="
+python - <<'PY'
+import torch, transformers, flash_attn, mmcv
+print("torch        :", torch.__version__, "cuda?", torch.version.cuda, "avail", torch.cuda.is_available())
+print("transformers :", transformers.__version__)
+print("flash_attn   :", flash_attn.__version__)
+print("mmcv         :", mmcv.__version__)
+PY
+
+echo
+echo "==== setup_uv_env.sh finished ===="
+echo "Activate later with:  source ${VENV_DIR}/bin/activate"
+echo "Then run:             WEIGHT_PATH=/share/nils.breuer/weights/fakeshield-v1-22b bash scripts/test.sh"
