@@ -63,10 +63,51 @@ echo "==== Installing DTE-FDM (editable, no-deps) ===="
 uv pip install -e ./DTE-FDM --no-deps
 
 # --------------------------------------------------------------------------- #
-# 5. flash-attn 2.3.6 (needs torch + ninja -> no build isolation)
+# 5. flash-attn 2.3.6 (needs torch + ninja + nvcc -> no build isolation)
+#    flash-attn compiles CUDA kernels, so it needs nvcc on PATH and CUDA_HOME
+#    set. On SLURM/HPC clusters, CUDA is loaded via the module system.
 # --------------------------------------------------------------------------- #
+echo "==== Ensuring nvcc / CUDA_HOME for flash-attn build ===="
+
+# Try to load a CUDA module if nvcc isn't available yet.
+if ! command -v nvcc >/dev/null 2>&1; then
+    # Source the module system if it's available.
+    if [ -f /etc/profile.d/modules.sh ]; then
+        # shellcheck disable=SC1091
+        source /etc/profile.d/modules.sh
+    fi
+    if command -v module >/dev/null 2>&1; then
+        # Try common CUDA module names; first match wins.
+        for mod in cuda/11.6 cuda/11.7 cuda/11.8 cuda/12.1 cuda cuda-toolkit; do
+            if module avail -t 2>&1 | grep -q "^${mod}"; then
+                echo "  loading module: ${mod}"
+                module load "${mod}"
+                break
+            fi
+        done
+    fi
+fi
+
+# Derive CUDA_HOME from nvcc if still unset.
+if [ -z "${CUDA_HOME:-}" ] && command -v nvcc >/dev/null 2>&1; then
+    export CUDA_HOME="$(dirname "$(dirname "$(command -v nvcc)")")"
+fi
+
+if ! command -v nvcc >/dev/null 2>&1; then
+    echo "ERROR: nvcc not found. flash-attn cannot build without it." >&2
+    echo "Load CUDA manually and re-run just this step:" >&2
+    echo "  module avail cuda" >&2
+    echo "  module load cuda/11.6   # (or whatever version is available)" >&2
+    echo "  export CUDA_HOME=\$(dirname \$(dirname \$(which nvcc)))" >&2
+    echo "  uv pip install flash-attn==2.3.6 --no-build-isolation" >&2
+    exit 1
+fi
+
+echo "  nvcc:       $(command -v nvcc)"
+echo "  CUDA_HOME:  ${CUDA_HOME}"
+
 echo "==== Installing flash-attn 2.3.6 ===="
-uv pip install flash-attn==2.3.6 --no-build-isolation
+MAX_JOBS=4 uv pip install flash-attn==2.3.6 --no-build-isolation
 
 # --------------------------------------------------------------------------- #
 # 6. Verify
