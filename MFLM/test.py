@@ -224,9 +224,9 @@ def inference(input_str, all_inputs, follow_up, generate):
     conv.append_message(conv.roles[1], text_output)
     conv_history["model"].append(text_output)
     color_history = []
-    save_img = None
+    seg_mask = None
     if "[SEG]" in text_output:
-        save_img, seg_mask = prepare_mask(pred_masks, text_output)
+        _, seg_mask = prepare_mask(pred_masks, text_output)
 
     output_str = text_output  # input_str
 
@@ -273,6 +273,9 @@ if __name__ == "__main__":
 
         filename = os.path.basename(input_image)
         output_image, markdown_out = inference(input_text, {'image': input_image, 'boxes': []}, False, False)
+        if output_image is None:
+            print("======== No [SEG] mask produced for: ", filename, " — skipped ========\n")
+            continue
         # output_image.show()
         save_path = os.path.join(output_path, filename)
         output_image.save(save_path)
