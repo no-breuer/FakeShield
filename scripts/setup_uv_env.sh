@@ -38,8 +38,10 @@ uv pip install torch==1.13.0 torchvision==0.14.0 \
 # --------------------------------------------------------------------------- #
 # 2. Python deps from requirements.txt (transformers stays at 4.28.0 here)
 # --------------------------------------------------------------------------- #
-echo "==== Installing requirements.txt ===="
-uv pip install -r requirements.txt
+echo "==== Installing requirements.txt (excluding flash-attn; installed separately below) ===="
+# flash-attn needs torch at build time but doesn't declare it, so it must be
+# built with --no-build-isolation after torch is present (step 5).
+grep -v '^flash-attn' requirements.txt | uv pip install -r -
 
 # --------------------------------------------------------------------------- #
 # 3. mmcv v1.4.7 from source (needs torch present -> no build isolation)
