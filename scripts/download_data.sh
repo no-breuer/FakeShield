@@ -41,25 +41,26 @@ huggingface-cli download --resume-download zhipeixu/MMTD-Set-34k --repo-type dat
 echo "==== Downloading coverage dataset (Photoshop forgery) ===="
 git clone --depth 1 https://github.com/wenbihan/coverage "${DATA_DIR}/photoshop/coverage_raw"
 # coverage ships images + masks together; arrange into image/ and mask/.
-python - <<'PY'
+DATA_DIR="${DATA_DIR}" python - <<'PY'
 import os, shutil, glob
-src = "dataset/photoshop/coverage_raw"
-dst_img = "dataset/photoshop/coverage/image"
-dst_mask = "dataset/photoshop/coverage/mask"
+src = os.path.join(os.environ["DATA_DIR"], "photoshop", "coverage_raw")
+dst_img = os.path.join(os.environ["DATA_DIR"], "photoshop", "coverage", "image")
+dst_mask = os.path.join(os.environ["DATA_DIR"], "photoshop", "coverage", "mask")
 os.makedirs(dst_img, exist_ok=True); os.makedirs(dst_mask, exist_ok=True)
 for f in glob.glob(os.path.join(src, "*")):
     b = os.path.basename(f).lower()
-    if "forge" in b or "tamper" in b or b.endswith((".png",)) and "mask" in b:
+    if "forge" in b or "tamper" in b or (b.endswith(".png") and "mask" in b):
         shutil.copy(f, os.path.join(dst_mask, os.path.basename(f)))
     else:
         shutil.copy(f, os.path.join(dst_img, os.path.basename(f)))
+print(f"coverage -> {dst_img} / {dst_mask}")
 PY
 
 echo "==== Downloading CASIA1+ via PSCC-Net repo (Photoshop forgery) ===="
 # PSCC-Net README lists CASIA1+ under its testing section.
 git clone --depth 1 https://github.com/proteus1991/PSCC-Net "${DATA_DIR}/photoshop/PSCC-Net_raw"
 echo "  -> manually move CASIA1+ tampered/auth images from"
-echo "     ${DATA_DIR}/photoshop/PSCC-Net_raw into dataset/photoshop/CASIAv1+_{Tp,Au}/{image,mask}"
+echo "     ${DATA_DIR}/photoshop/PSCC-Net_raw into ${DATA_DIR}/photoshop/CASIAv1+_{Tp,Au}/{image,mask}"
 
 # --------------------------------------------------------------------------- #
 # 3. MANUAL DOWNLOADS (need a browser / account)
@@ -85,4 +86,13 @@ After downloading, regenerate the question/labels files with:
       --output ./playground/test.jsonl --labels-output ./playground/test_labels.jsonl
 EOF
 
+echo
 echo "==== download_data.sh finished ===="
+echo "Weights downloaded to : ${WEIGHT_DIR}"
+echo "  -> FakeShield weights : ${WEIGHT_DIR}/fakeshield-v1-22b/{DTE-FDM,MFLM,DTG.pth}"
+echo "  -> SAM weight         : ${WEIGHT_DIR}/sam_vit_h_4b8939.pth"
+echo "Datasets downloaded to : ${DATA_DIR}"
+echo
+echo "When running the pipeline, point test.sh at these locations, e.g.:"
+echo "  WEIGHT_PATH=${WEIGHT_DIR}/fakeshield-v1-22b bash scripts/test.sh"
+echo "  (pass GT mask dirs under ${DATA_DIR} to evaluate_metrics.py --gt-dir)"
